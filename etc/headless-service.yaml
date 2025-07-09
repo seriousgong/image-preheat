@@ -1,0 +1,70 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: image-preheat-peers
+  namespace: default
+  labels:
+    app: image-preheat
+spec:
+  clusterIP: None  # Headless service
+  selector:
+    app: image-preheat
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: image-preheat
+  namespace: default
+  labels:
+    app: image-preheat
+spec:
+  selector:
+    matchLabels:
+      app: image-preheat
+  template:
+    metadata:
+      labels:
+        app: image-preheat
+    spec:
+      containers:
+      - name: image-preheat
+        image: your-registry/image-preheat:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: K8S_NAMESPACE
+          value: "default"
+        - name: K8S_LOCK_CM
+          value: "image-preheat-lock"
+        - name: PREHEAT_CONCURRENCY
+          value: "2"
+        - name: DOWNLOAD_API_CONCURRENCY
+          value: "4"
+        - name: INTERVAL
+          value: "1m"
+        volumeMounts:
+        - name: image-list
+          mountPath: /etc/preheater
+          readOnly: true
+        - name: docker-sock
+          mountPath: /var/run/docker.sock
+      volumes:
+      - name: image-list
+        configMap:
+          name: image-list-config
+      - name: docker-sock
+        hostPath:
+          path: /var/run/docker.sock
+          type: Socket 
