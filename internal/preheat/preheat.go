@@ -3,7 +3,6 @@ package preheat
 import (
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"time"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/juju/ratelimit"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/rs/zerolog/log"
 )
 
 // 你需要实现 imageExistsLocally 和 preheatImage
@@ -35,9 +35,16 @@ func acquirePreheatSlot() { preheatSemaphore <- struct{}{} }
 func releasePreheatSlot() { <-preheatSemaphore }
 
 func preheatImageWithLimit(image string) error {
+	log.Info().Str("image", image).Msg("开始预热镜像任务")
 	acquirePreheatSlot()
 	defer releasePreheatSlot()
-	return preheatImage(image)
+	err := preheatImage(image)
+	if err != nil {
+		log.Error().Err(err).Str("image", image).Msg("镜像预热失败")
+	} else {
+		log.Info().Str("image", image).Msg("镜像预热完成")
+	}
+	return err
 }
 
 func PreheatImageWithLimit(image string) error {
@@ -57,6 +64,7 @@ func loadImageFromReader(reader io.Reader) error {
 // 查询其他节点并直接流式加载镜像
 func fetchImageFromPeers(image string) error {
 	peers := GetPeerIPs() // 使用新的 peer 发现机制
+	log.Info().Str("image", image).Strs("peers", peers).Msg("尝试节点间拉取镜像")
 	if len(peers) == 0 {
 		return fmt.Errorf("没有可用的 peers")
 	}
@@ -64,7 +72,9 @@ func fetchImageFromPeers(image string) error {
 	// 尝试轮询方式
 	for i := 0; i < len(peers); i++ {
 		peer := peerSelector.GetNextPeer()
+		log.Debug().Str("image", image).Str("peer", peer).Msg("尝试从 peer 拉取镜像")
 		if err := tryDownloadFromPeer(peer, image); err == nil {
+			log.Info().Str("image", image).Str("peer", peer).Msg("节点间拉取成功")
 			return nil // 成功加载
 		}
 	}
@@ -72,11 +82,13 @@ func fetchImageFromPeers(image string) error {
 	// 轮询失败，尝试随机选择
 	for i := 0; i < 3; i++ { // 最多尝试3次
 		peer := peerSelector.GetRandomPeer()
+		log.Debug().Str("image", image).Str("peer", peer).Msg("随机尝试从 peer 拉取镜像")
 		if err := tryDownloadFromPeer(peer, image); err == nil {
+			log.Info().Str("image", image).Str("peer", peer).Msg("节点间拉取成功")
 			return nil // 成功加载
 		}
 	}
-
+	log.Warn().Str("image", image).Msg("所有节点间拉取失败")
 	return fmt.Errorf("集群内无可用镜像")
 }
 
@@ -108,6 +120,7 @@ func tryDownloadFromPeer(peer, image string) error {
 
 func pullImageFromRegistry(image string) error {
 	node := config.NodeName
+	log.Info().Str("image", image).Str("node", node).Msg("开始回源拉取镜像")
 	metrics.RegistryPullingGauge.WithLabelValues(image, node).Set(1)
 	timer := prometheus.NewTimer(metrics.RegistryPullDuration.WithLabelValues(image))
 	defer func() {
@@ -116,8 +129,10 @@ func pullImageFromRegistry(image string) error {
 	}()
 	err := docker.Pull(image)
 	if err != nil {
+		log.Error().Err(err).Str("image", image).Str("node", node).Msg("回源拉取镜像失败")
 		metrics.RegistryPullTotal.WithLabelValues(image, metrics.ResultFailed).Inc()
 	} else {
+		log.Info().Str("image", image).Str("node", node).Msg("回源拉取镜像成功")
 		metrics.RegistryPullTotal.WithLabelValues(image, metrics.ResultSuccess).Inc()
 	}
 	return err
@@ -135,13 +150,13 @@ func InitK8sLock() error {
 	}
 
 	k8sLock = lock
-	log.Printf("K8s锁初始化成功: namespace=%s, configmap=%s, timeout=%v, node=%s",
-		k8sNamespace, k8sCMName, k8sLockTimeout, k8sNodeName)
+	log.Info().Str("namespace", k8sNamespace).Str("configmap", k8sCMName).Dur("timeout", k8sLockTimeout).Str("node", k8sNodeName).Msg("K8s锁初始化成功")
 	return nil
 }
 
 // 修改预热流程，拉取前抢锁，拉取后释放
 func preheatImage(image string) error {
+	log.Debug().Str("image", image).Msg("进入预热主流程")
 	// P2P
 	if err := fetchImageFromPeers(image); err == nil {
 		metrics.ImagePreheatTotal.WithLabelValues(image, metrics.SourceP2P).Inc()
@@ -149,16 +164,16 @@ func preheatImage(image string) error {
 	}
 	// 回源前分布式锁抢占
 	if k8sLock == nil || k8sNodeName == "" {
-		log.Printf("警告：K8s锁未配置，跳过镜像拉取: %s (NODE_NAME=%s, k8sLock=%v)", image, k8sNodeName, k8sLock != nil)
+		log.Warn().Str("image", image).Str("node", k8sNodeName).Bool("k8sLock", k8sLock != nil).Msg("K8s锁未配置，跳过镜像拉取")
 		return fmt.Errorf("K8s锁未正确配置，无法安全拉取镜像")
 	}
 	acquired, err := k8sLock.TryAcquireLock(image, k8sNodeName)
 	if err != nil {
-		log.Printf("获取锁失败: %v", err)
+		log.Error().Err(err).Msg("获取锁失败")
 		return err
 	}
 	if !acquired {
-		log.Printf("有其他节点正在拉取镜像: %s，跳过本次拉取", image)
+		log.Info().Str("image", image).Msg("有其他节点正在拉取镜像，跳过本次拉取")
 		return nil
 	}
 	// 启动心跳 goroutine
@@ -257,20 +272,36 @@ func RateLimitedReader(r io.Reader) io.Reader {
 
 // 流式下载镜像到 HTTP 响应（带限速）
 func StreamImageToHTTPWithRateLimit(image string, writer io.Writer) error {
+	log.Info().Str("image", image).Msg("收到流式镜像下载请求")
 	exists, err := docker.ImageExists(image)
 	if err != nil {
+		log.Error().Err(err).Str("image", image).Msg("本地镜像校验失败")
 		return fmt.Errorf("获取本地镜像列表失败: %v", err)
 	}
 	if !exists {
+		log.Warn().Str("image", image).Msg("镜像不存在，无法下载")
 		return fmt.Errorf("镜像不存在: %s", image)
 	}
 
 	pr, pw := io.Pipe()
 	go func() {
+		log.Debug().Str("image", image).Msg("开始 docker.Save 镜像流式输出")
 		defer pw.Close()
-		_ = docker.Save(image, pw)
+		err := docker.Save(image, pw)
+		if err != nil {
+			log.Error().Err(err).Str("image", image).Msg("docker.Save 失败")
+		} else {
+			log.Debug().Str("image", image).Msg("docker.Save 完成")
+		}
 	}()
 
-	_, err = io.Copy(writer, RateLimitedReader(pr))
+	start := time.Now()
+	n, err := io.Copy(writer, RateLimitedReader(pr))
+	duration := time.Since(start)
+	if err != nil {
+		log.Error().Err(err).Str("image", image).Msg("io.Copy 传输失败")
+	} else {
+		log.Info().Str("image", image).Int64("bytes", n).Dur("duration", duration).Msg("镜像流式传输完成")
+	}
 	return err
 }

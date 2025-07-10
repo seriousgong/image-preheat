@@ -7,16 +7,20 @@ import (
 	"image-preheat/internal/metrics"
 	"image-preheat/internal/preheat"
 	"image-preheat/internal/task"
-	"log"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 func main() {
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+	log.Logger = zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr}).With().Timestamp().Logger()
 	// 初始化 Docker 客户端
 	if err := docker.InitDockerClient(); err != nil {
-		log.Fatalf("Docker 客户端初始化失败: %v", err)
+		log.Fatal().Err(err).Msg("Docker 客户端初始化失败")
 	}
 
 	// 初始化全局下载限速桶
@@ -31,7 +35,7 @@ func main() {
 	go task.StartPeriodicCheck(cache, config.Interval)
 
 	if err := preheat.InitK8sLock(); err != nil {
-		log.Fatalf("K8s 分布式锁初始化失败: %v", err)
+		log.Fatal().Err(err).Msg("K8s 分布式锁初始化失败")
 	}
 
 	metrics.InitMetrics()
@@ -43,10 +47,10 @@ func main() {
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	go func() {
-		log.Println("Gin HTTP 服务启动于 :8080 ...")
+		log.Info().Msg("Gin HTTP 服务启动于 :8080 ...")
 		err := r.Run(":8080")
 		if err != nil {
-			log.Fatalf("Gin HTTP 服务启动失败: %v", err)
+			log.Fatal().Err(err).Msg("Gin HTTP 服务启动失败")
 		}
 	}()
 

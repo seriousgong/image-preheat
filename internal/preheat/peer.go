@@ -3,11 +3,12 @@ package preheat
 import (
 	"fmt"
 	"image-preheat/internal/config"
-	"log"
 	"net"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 // PeerSelector 节点选择器
@@ -40,7 +41,7 @@ func (ps *PeerSelector) UpdatePeers() error {
 
 	ps.peers = peers
 	ps.lastUpdate = time.Now()
-	log.Printf("更新 peers 列表: %v", peers)
+	log.Info().Strs("peers", peers).Msg("更新 peers 列表")
 	return nil
 }
 
@@ -113,7 +114,7 @@ func getMyPodIP() string {
 	// 方法2: 从网络接口获取
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
-		log.Printf("获取网络接口失败: %v", err)
+		log.Error().Err(err).Msg("获取网络接口失败")
 		return ""
 	}
 
@@ -133,13 +134,15 @@ var peerSelector = NewPeerSelector()
 
 // 定期更新 peers 列表
 func StartPeerDiscovery() {
+	log.Info().Msg("启动节点发现定时任务")
 	ticker := time.NewTicker(config.PeerDiscoveryInterval)
 	defer ticker.Stop()
 
 	for {
 		<-ticker.C
+		log.Debug().Msg("周期性刷新 peers 列表")
 		if err := peerSelector.UpdatePeers(); err != nil {
-			log.Printf("更新 peers 失败: %v", err)
+			log.Error().Err(err).Msg("更新 peers 失败")
 		}
 	}
 }

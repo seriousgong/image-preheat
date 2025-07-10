@@ -3,20 +3,23 @@ package task
 import (
 	"image-preheat/internal/config"
 	"image-preheat/internal/preheat"
-	"log"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 func StartPeriodicCheck(cache *config.ImageListCache, interval time.Duration) {
+	log.Info().Dur("interval", interval).Msg("启动定时批量预热任务 StartPeriodicCheck")
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
 		<-ticker.C
+		log.Info().Msg("开始新一轮批量镜像预热")
 		images := cache.GetImages()
 		localImages, err := preheat.GetAllLocalImages()
 		if err != nil {
-			log.Printf("获取本地镜像列表失败: %v", err)
+			log.Error().Err(err).Msg("获取本地镜像列表失败")
 			continue
 		}
 		var wg sync.WaitGroup
@@ -25,17 +28,18 @@ func StartPeriodicCheck(cache *config.ImageListCache, interval time.Duration) {
 				continue
 			}
 			if _, ok := localImages[img]; ok {
-				log.Printf("本地已存在镜像: %s", img)
+				log.Info().Str("image", img).Msg("本地已存在镜像")
 				continue
 			}
 			wg.Add(1)
 			go func(image string) {
 				defer wg.Done()
 				if err := preheat.PreheatImageWithLimit(image); err != nil {
-					log.Printf("预热镜像 %s 失败: %v", image, err)
+					log.Error().Err(err).Str("image", image).Msg("预热镜像失败")
 				}
 			}(img)
 		}
 		wg.Wait()
+		log.Info().Msg("本轮批量镜像预热结束")
 	}
 }
