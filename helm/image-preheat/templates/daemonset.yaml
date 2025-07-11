@@ -1,0 +1,122 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "image-preheat.fullname" . }}
+  namespace: {{ .Values.namespace | default "default" }}
+  labels:
+    {{- include "image-preheat.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "image-preheat.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "image-preheat.selectorLabels" . | nindent 8 }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+        {{- with .Values.annotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "image-preheat.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: {{ .Chart.Name }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        env:
+        # K8s 环境变量
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: K8S_NAMESPACE
+          value: {{ .Values.namespace | default "default" | quote }}
+        - name: K8S_LOCK_CM
+          value: {{ include "image-preheat.lockConfigMapName" . | quote }}
+        # 应用配置
+        - name: K8S_LOCK_TIMEOUT
+          value: {{ .Values.config.lockTimeout | quote }}
+        - name: IMAGE_LIST_PATH
+          value: {{ .Values.config.imageListPath | quote }}
+        - name: PREHEAT_CONCURRENCY
+          value: {{ .Values.config.preheatConcurrency | quote }}
+        - name: DOWNLOAD_API_CONCURRENCY
+          value: {{ .Values.config.downloadAPIConcurrency | quote }}
+        - name: INTERVAL
+          value: {{ .Values.config.interval | quote }}
+        - name: PULLING_TIMEOUT
+          value: {{ .Values.config.pullingTimeout | quote }}
+        - name: MOUNT_DIR
+          value: {{ .Values.config.mountDir | quote }}
+        - name: DOWNLOAD_RATE_LIMIT
+          value: {{ .Values.config.downloadRateLimit | quote }}
+        - name: PEER_DISCOVERY_INTERVAL
+          value: {{ .Values.config.peerDiscoveryInterval | quote }}
+        # 资源限制
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        # 健康检查
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        # 安全上下文
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        # 挂载点
+        volumeMounts:
+        - name: image-list
+          mountPath: /etc/preheater
+          readOnly: true
+        - name: docker-sock
+          mountPath: /var/run/docker.sock
+        - name: tmp
+          mountPath: /tmp
+      # 安全上下文
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      # 卷定义
+      volumes:
+      - name: image-list
+        configMap:
+          name: {{ include "image-preheat.imageListConfigMapName" . }}
+      - name: docker-sock
+        hostPath:
+          path: /var/run/docker.sock
+          type: Socket
+      - name: tmp
+        emptyDir: {}
+      # 节点选择器
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # 容忍度
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # 亲和性
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }} 

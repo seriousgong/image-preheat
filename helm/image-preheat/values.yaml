@@ -1,0 +1,131 @@
+# Default values for image-preheat
+# This is a YAML-formatted file.
+
+# 全局配置
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: ""
+
+# 镜像配置
+image:
+  repository: your-registry/image-preheat
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+# 镜像拉取密钥
+imagePullSecrets: []
+
+# 命名空间
+namespace: "default"
+
+# ServiceAccount 配置
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# 镜像列表配置
+imageList:
+  - "nginx:latest"
+  - "redis:7-alpine"
+  - "postgres:15"
+
+# 应用配置
+config:
+  # 分布式锁配置
+  lockConfigMap: "image-preheat-lock"
+  lockTimeout: "5m"
+  
+  # 镜像列表配置
+  imageListPath: "/etc/preheater/images.list"
+  
+  # 并发控制
+  preheatConcurrency: 1
+  downloadAPIConcurrency: 4
+  
+  # 时间配置
+  interval: "1m"
+  pullingTimeout: "5m"
+  peerDiscoveryInterval: "30s"
+  
+  # 目录配置
+  mountDir: "/etc/preheater"
+  
+  # 限速配置（字节/秒）
+  downloadRateLimit: "524288000"  # 500MB/s
+
+# 资源限制
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# 安全上下文
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+# 节点选择器
+nodeSelector: {}
+
+# 容忍度
+tolerations: []
+
+# 亲和性
+affinity: {}
+
+# 服务配置
+service:
+  enabled: false
+  type: ClusterIP
+  port: 8080
+  annotations: {}
+
+# Ingress 配置
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: Prefix
+          port: 8080
+  tls: []
+
+# ServiceMonitor 配置
+serviceMonitor:
+  enabled: false
+  interval: "30s"
+  scrapeTimeout: "10s"
+  additionalLabels: {}
+
+# PodDisruptionBudget 配置
+pdb:
+  enabled: false
+  minAvailable: 1
+  maxUnavailable: 1
+
+# 标签
+labels: {}
+
+# 注解
+annotations: {} 

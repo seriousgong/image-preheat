@@ -105,9 +105,9 @@ flowchart TD
 
 - `registry_pull_total{image,result}`：回源拉取次数
 - `registry_pull_duration_seconds{image}`：回源拉取耗时
-- `p2p_fetch_total{image,peer}`：节点间拉取成功次数
-- `p2p_fetch_failed_total{image,peer,reason}`：节点间拉取失败次数
-- `p2p_fetch_duration_seconds{image,peer}`：节点间拉取耗时
+- `peer_fetch_total{image,peer}`：节点间拉取成功次数
+- `peer_fetch_failed_total{image,peer,reason}`：节点间拉取失败次数
+- `peer_fetch_duration_seconds{image,peer}`：节点间拉取耗时
 - `image_preheat_total{image,source}`：预热任务成功次数（source: 节点间/回源）
 - `image_preheat_failed_total{image,source}`：预热任务失败次数
 - `registry_pulling{image,node}`：当前正在回源的镜像（gauge）
