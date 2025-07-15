@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: {{ include "image-preheat.fullname" . }}
-  namespace: {{ .Values.namespace | default "default" }}
+  namespace: {{ .Release.Namespace | default "default" }}
   labels:
     {{- include "image-preheat.labels" . | nindent 4 }}
 spec:
@@ -21,7 +21,7 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
-      serviceAccountName: {{ include "image-preheat.serviceAccountName" . }}
+      serviceAccountName: {{ include "image-preheat.fullname" . }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -45,7 +45,9 @@ spec:
             fieldRef:
               fieldPath: status.podIP
         - name: K8S_NAMESPACE
-          value: {{ .Values.namespace | default "default" | quote }}
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         - name: K8S_LOCK_CM
           value: {{ include "image-preheat.lockConfigMapName" . | quote }}
         # 应用配置
@@ -65,6 +67,8 @@ spec:
           value: {{ .Values.config.mountDir | quote }}
         - name: DOWNLOAD_RATE_LIMIT
           value: {{ .Values.config.downloadRateLimit | quote }}
+        - name: PEER_DISCOVERY_SERVICE_NAME
+          value: {{ include "image-preheat.headlessServiceName" . }}
         - name: PEER_DISCOVERY_INTERVAL
           value: {{ .Values.config.peerDiscoveryInterval | quote }}
         # 资源限制
@@ -76,7 +80,7 @@ spec:
             path: /health
             port: 8080
           initialDelaySeconds: 30
-          periodSeconds: 10
+          periodSeconds: 120
           timeoutSeconds: 5
           failureThreshold: 3
         # 安全上下文

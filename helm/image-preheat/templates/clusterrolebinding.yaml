@@ -10,5 +10,5 @@ roleRef:
   name: {{ include "image-preheat.fullname" . }}-configmap-manager
 subjects:
 - kind: ServiceAccount
-  name: {{ include "image-preheat.serviceAccountName" . }}
-  namespace: {{ .Values.namespace | default "default" }} 
+  name: {{ include "image-preheat.fullname" . }}
+  namespace: {{ .Release.Namespace | default "default" }} 

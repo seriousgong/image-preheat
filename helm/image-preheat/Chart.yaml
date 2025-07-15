@@ -2,7 +2,7 @@ apiVersion: v2
 name: image-preheat
 description: Kubernetes DaemonSet 镜像预热与节点间分发系统
 type: application
-version: 0.1.0
+version: 0.2.2
 appVersion: "1.0.0"
 keywords:
   - image
@@ -10,9 +10,3 @@ keywords:
   - kubernetes
   - daemonset
   - docker
-home: https://github.com/your-org/image-preheat
-sources:
-  - https://github.com/your-org/image-preheat
-maintainers:
-  - name: Your Name
-    email: your.email@example.com 

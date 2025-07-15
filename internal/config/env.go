@@ -77,6 +77,10 @@ var (
 	// 环境变量：DOWNLOAD_RATE_LIMIT，默认：500*1024*1024（500MB/s）
 	DownloadRateLimit = GetEnvInt("DOWNLOAD_RATE_LIMIT", 500*1024*1024)
 
+	// 节点发现服务名称
+	// 环境变量：PEER_DISCOVERY_SERVICE_NAME，默认："image-preheat-peers.default.svc.cluster.local"
+	PeerDiscoveryServiceName = GetEnv("PEER_DISCOVERY_SERVICE_NAME", "image-preheat-peers.default.svc.cluster.local")
+
 	// 节点发现间隔
 	// 环境变量：PEER_DISCOVERY_INTERVAL，默认：30s
 	PeerDiscoveryInterval = GetEnvDuration("PEER_DISCOVERY_INTERVAL", 30*time.Second)

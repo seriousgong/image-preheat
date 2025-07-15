@@ -15,16 +15,6 @@ image:
 
 # 镜像拉取密钥
 imagePullSecrets: []
-
-# 命名空间
-namespace: "default"
-
-# ServiceAccount 配置
-serviceAccount:
-  create: true
-  name: ""
-  annotations: {}
-
 # 镜像列表配置
 imageList:
   - "nginx:latest"
@@ -64,24 +54,10 @@ resources:
     cpu: 100m
     memory: 128Mi
 
-# 安全上下文
-securityContext:
-  runAsNonRoot: true
-  runAsUser: 1000
-  runAsGroup: 1000
-  fsGroup: 1000
-  allowPrivilegeEscalation: false
-  readOnlyRootFilesystem: false
-  capabilities:
-    drop:
-      - ALL
-
-podSecurityContext:
-  runAsNonRoot: true
-  runAsUser: 1000
-  runAsGroup: 1000
-  fsGroup: 1000
-
+# 标签
+labels: {}
+# 注解
+annotations: {} 
 # 节点选择器
 nodeSelector: {}
 
@@ -90,42 +66,3 @@ tolerations: []
 
 # 亲和性
 affinity: {}
-
-# 服务配置
-service:
-  enabled: false
-  type: ClusterIP
-  port: 8080
-  annotations: {}
-
-# Ingress 配置
-ingress:
-  enabled: false
-  className: ""
-  annotations: {}
-  hosts:
-    - host: chart-example.local
-      paths:
-        - path: /
-          pathType: Prefix
-          port: 8080
-  tls: []
-
-# ServiceMonitor 配置
-serviceMonitor:
-  enabled: false
-  interval: "30s"
-  scrapeTimeout: "10s"
-  additionalLabels: {}
-
-# PodDisruptionBudget 配置
-pdb:
-  enabled: false
-  minAvailable: 1
-  maxUnavailable: 1
-
-# 标签
-labels: {}
-
-# 注解
-annotations: {} 

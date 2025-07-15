@@ -86,7 +86,7 @@ func (ps *PeerSelector) GetPeers() []string {
 // discoverPeersFromHeadlessService 从 headless service 发现 peers
 func discoverPeersFromHeadlessService() ([]string, error) {
 	// 解析 headless service DNS
-	serviceName := "image-preheat-peers.default.svc.cluster.local"
+	serviceName := config.PeerDiscoveryServiceName
 	ips, err := net.LookupHost(serviceName)
 	if err != nil {
 		return nil, fmt.Errorf("DNS 解析失败: %v", err)
