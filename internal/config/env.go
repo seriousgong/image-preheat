@@ -84,4 +84,21 @@ var (
 	// 节点发现间隔
 	// 环境变量：PEER_DISCOVERY_INTERVAL，默认：30s
 	PeerDiscoveryInterval = GetEnvDuration("PEER_DISCOVERY_INTERVAL", 30*time.Second)
+
+	// 层状态查询相关配置
+
+	// 层状态查询 API 并发数（/layers/check）
+	// 环境变量：LAYERS_CHECK_CONCURRENCY，默认：2
+	LayersCheckConcurrency = GetEnvInt("LAYERS_CHECK_CONCURRENCY", 2)
+	// 层状态查询最大digest数量
+	// 环境变量：MAX_DIGESTS_PER_REQUEST，默认：50
+	MaxDigestsPerRequest = GetEnvInt("MAX_DIGESTS_PER_REQUEST", 50)
+
+	// Docker存储根目录
+	// 环境变量：DOCKER_ROOT_DIR，默认：/var/lib/docker
+	DockerRootDir = GetEnv("DOCKER_ROOT_DIR", "/var/lib/docker")
+
+	// Docker存储驱动类型
+	// 环境变量：DOCKER_STORAGE_DRIVER，默认：overlay2"
+	DockerStorageDriver = GetEnv("DOCKER_STORAGE_DRIVER", "overlay2")
 )

@@ -257,6 +257,11 @@ func GetMaxDownloadConcurrency() int {
 	return cap(downloadAPISemaphore)
 }
 
+// CheckLayersExist 批量检查层是否存在
+func CheckLayersExist(digests []string) (exists, missing []string, err error) {
+	return docker.CheckLayersExist(digests)
+}
+
 // 初始化下载限速桶
 func InitDownloadRateLimit(bytesPerSec int64) {
 	downloadRateLimitBucket = ratelimit.NewBucketWithRate(float64(bytesPerSec), bytesPerSec)

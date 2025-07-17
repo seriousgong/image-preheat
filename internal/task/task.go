@@ -29,6 +29,8 @@ func StartPeriodicCheck(cache *config.ImageListCache, interval time.Duration) {
 			}
 			if _, ok := localImages[img]; ok {
 				log.Info().Str("image", img).Msg("本地已存在镜像")
+				// 新增：维护预热镜像digest
+				preheat.GetPreheatedDigestManager().UpdateDigests(img)
 				continue
 			}
 			wg.Add(1)
@@ -36,6 +38,9 @@ func StartPeriodicCheck(cache *config.ImageListCache, interval time.Duration) {
 				defer wg.Done()
 				if err := preheat.PreheatImageWithLimit(image); err != nil {
 					log.Error().Err(err).Str("image", image).Msg("预热镜像失败")
+				} else {
+					// 新增：预热成功后维护digest
+					preheat.GetPreheatedDigestManager().UpdateDigests(image)
 				}
 			}(img)
 		}
