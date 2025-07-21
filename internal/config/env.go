@@ -101,4 +101,8 @@ var (
 	// Docker存储驱动类型
 	// 环境变量：DOCKER_STORAGE_DRIVER，默认：overlay2"
 	DockerStorageDriver = GetEnv("DOCKER_STORAGE_DRIVER", "overlay2")
+
+	// peers server 主机名或IP
+	// 环境变量：PEERS_SERVER_NAME，默认：127.0.0.1
+	PeersServerName = GetEnv("PEERS_SERVER_NAME", "127.0.0.1")
 )

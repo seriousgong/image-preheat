@@ -1,9 +1,11 @@
 package preheat
 
 import (
+	"encoding/json"
 	"fmt"
 	"image-preheat/internal/config"
 	"net"
+	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -33,10 +35,17 @@ func (ps *PeerSelector) UpdatePeers() error {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 
-	// 从 headless service 获取 peers
-	peers, err := discoverPeersFromHeadlessService()
-	if err != nil {
-		return fmt.Errorf("发现 peers 失败: %v", err)
+	var peers []string
+	var err error
+
+	// 优先用优选接口
+	peers, err = discoverPreferredPeers(config.NodeName)
+	if err != nil || len(peers) == 0 {
+		log.Warn().Err(err).Msg("优选peers接口失败，fallback到headless service")
+		peers, err = discoverPeersFromHeadlessService()
+		if err != nil {
+			return fmt.Errorf("发现 peers 失败: %v", err)
+		}
 	}
 
 	ps.peers = peers
@@ -101,6 +110,24 @@ func discoverPeersFromHeadlessService() ([]string, error) {
 		}
 	}
 
+	return peers, nil
+}
+
+// discoverPreferredPeers 从本地 server 获取优选的 peer IP 列表
+func discoverPreferredPeers(nodeName string) ([]string, error) {
+	url := "http://" + config.PeersServerName + ":8080/peers/priority?node=" + nodeName
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("优选peers接口返回非200: %d", resp.StatusCode)
+	}
+	var peers []string
+	if err := json.NewDecoder(resp.Body).Decode(&peers); err != nil {
+		return nil, err
+	}
 	return peers, nil
 }
 
